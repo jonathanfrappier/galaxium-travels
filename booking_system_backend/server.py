@@ -14,11 +14,15 @@ from schemas import (
     BookingRequest,
     ErrorResponse,
     FlightOut,
+    ItineraryLegOut,
+    ItineraryOut,
+    ItineraryRequest,
+    ItinerarySearchResult,
     UserOut,
     UserRegistration,
 )
 from seed import seed
-from services import booking, flight, user
+from services import booking, flight, itinerary, user
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,6 +32,11 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Initialize the database on startup and optionally seed demo data.
+
+    Seeding runs unless the `SEED_DEMO_DATA` environment variable is set to a
+    value other than 1, true, yes, or on (default: true).
+    """
     # Startup
     init_db()
 
@@ -211,6 +220,80 @@ def get_user_endpoint(name: str, email: str, db: Session = Depends(get_db)):
         status = 404 if result.error_code == "USER_NOT_FOUND" else 422
         raise HTTPException(status_code=status, detail=result.model_dump())
     return result
+
+
+# ==================== ITINERARY ENDPOINTS ====================
+
+@app.get("/itineraries/search", response_model=list[ItinerarySearchResult], tags=["Itineraries"])
+def search_itineraries_endpoint(
+    origin: str,
+    destination: str,
+    date: str,
+    db: Session = Depends(get_db),
+):
+    """Search for 1 to 3 leg connecting flight itineraries between planets or moons on a given date.
+
+    Requires origin (planet/moon), destination (planet/moon), and departure date (YYYY-MM-DD in UTC).
+    Returns a list of matching multi-leg itineraries sorted by total duration and price.
+    Raises 422 if the date format is invalid.
+    """
+    result = itinerary.search_itineraries(db, origin=origin, destination=destination, date=date)
+    if isinstance(result, ErrorResponse):
+        raise HTTPException(status_code=422, detail=result.model_dump())
+    return result
+
+
+@app.post("/itineraries", response_model=ItineraryOut, tags=["Itineraries"])
+def create_itinerary_endpoint(request: ItineraryRequest, db: Session = Depends(get_db)):
+    """Create a temporary hold for a multi-leg flight itinerary (1 to 3 legs).
+
+    Requires user_id, registered traveler name, and list of 1 to 3 flight_ids.
+    Places inventory holds for every leg across the itinerary.
+    Raises 404 if user or any flight is not found, 409 if name does not match user or no seats are available,
+    502 if holding inventory with the Java service fails, or 422 for invalid flight counts/connections.
+    """
+    result = itinerary.create_itinerary(db, request)
+    if isinstance(result, ErrorResponse):
+        if result.error_code in ("USER_NOT_FOUND", "FLIGHT_NOT_FOUND"):
+            status = 404
+        elif result.error_code in ("NO_SEATS_AVAILABLE", "NAME_MISMATCH"):
+            status = 409
+        elif result.error_code == "HOLD_FAILED":
+            status = 502
+        else:
+            status = 422
+        raise HTTPException(status_code=status, detail=result.model_dump())
+    return result
+
+
+@app.post("/itineraries/{itinerary_id}/confirm", response_model=ItineraryOut, tags=["Itineraries"])
+def confirm_itinerary_endpoint(itinerary_id: int, db: Session = Depends(get_db)):
+    """Confirm a previously held multi-leg itinerary into confirmed bookings.
+
+    Requires itinerary_id. Confirms all leg holds with the inventory hold service.
+    If confirmation fails on any leg, previously confirmed legs are compensated (cancelled)
+    and remaining holds are released.
+    Raises 404 if itinerary is not found, 409 if itinerary is in an invalid state,
+    or 502 if confirmation fails.
+    """
+    result = itinerary.confirm_itinerary(db, itinerary_id)
+    if isinstance(result, ErrorResponse):
+        if result.error_code == "ITINERARY_NOT_FOUND":
+            status = 404
+        elif result.error_code == "INVALID_ITINERARY_STATE":
+            status = 409
+        elif result.error_code == "CONFIRM_FAILED":
+            status = 502
+        else:
+            status = 422
+        raise HTTPException(status_code=status, detail=result.model_dump())
+    return result
+
+
+@app.get("/users/{user_id}/itineraries", response_model=list[ItineraryOut], tags=["Itineraries"])
+def get_user_itineraries_endpoint(user_id: int, db: Session = Depends(get_db)):
+    """Retrieve all confirmed multi-leg itineraries for a specific user, ordered by departure date."""
+    return itinerary.get_user_itineraries(db, user_id)
 
 
 # ==================== JAVA SERVICE INTEGRATION ====================

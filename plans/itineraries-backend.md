@@ -2,7 +2,7 @@
 
 Overview and decisions: [`itineraries-plan.md`](itineraries-plan.md). Read it first.
 
-Status: `[ ] pending`
+Status: `[x] completed`
 
 ## Intent
 
@@ -78,4 +78,14 @@ Add itinerary search, all-or-nothing holding through the Java hold service, conf
 
 ## Handoff notes
 
-(Filled in when this sub-task is done.)
+- **Endpoints implemented:**
+  - `GET /itineraries/search?origin={origin}&destination={destination}&date={YYYY-MM-DD}`: returns `ItinerarySearchResult[]`
+  - `POST /itineraries`: payload `{ user_id: int, name: str, flight_ids: int[] }`, returns `ItineraryOut` with `status: "held"`
+  - `POST /itineraries/{itinerary_id}/confirm`: returns `ItineraryOut` with `status: "confirmed"`
+  - `GET /users/{user_id}/itineraries`: returns `ItineraryOut[]` (confirmed trips for the user)
+- **Error Codes:**
+  - `INVALID_DATE` (422)
+  - `USER_NOT_FOUND` (404), `FLIGHT_NOT_FOUND` (404)
+  - `NAME_MISMATCH` (409), `NO_SEATS_AVAILABLE` (409)
+  - `HOLD_FAILED` (502), `CONFIRM_FAILED` (502)
+  - `INVALID_FLIGHT_COUNT` (422), `INVALID_CONNECTION` (422)

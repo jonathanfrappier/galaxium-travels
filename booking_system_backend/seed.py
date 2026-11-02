@@ -11,6 +11,14 @@ from models import Base, Booking, Flight, User
 
 
 def seed():
+    """Populate the database with demo users, flights, and bookings.
+
+    Creates the tables if needed. Does nothing if the database already contains
+    users, so registered data is never overwritten. Seeds 10 users, 10 flights
+    (seats split 60/30/10 across economy, business, and galaxium), and 20
+    bookings with randomly chosen users, flights, statuses, and seat classes.
+    Seeded bookings do not change the flights' seat counters.
+    """
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     # Only seed if the database is empty to avoid wiping registered users
@@ -45,6 +53,11 @@ def seed():
         ("Mars", "Jupiter", "2099-01-08T13:00:00Z", "2099-01-08T23:00:00Z", 2500000, 10),
         ("Europa", "Earth", "2099-01-09T09:00:00Z", "2099-01-09T21:00:00Z", 3000000, 10),
         ("Earth", "Pluto", "2099-01-10T06:00:00Z", "2099-01-11T06:00:00Z", 5000000, 10),
+        ("Earth", "Mars", "2099-02-01 09:00", "2099-02-01 17:00", 1000000, 10),
+        ("Mars", "Jupiter", "2099-02-02 13:00", "2099-02-02 23:00", 2500000, 10),
+        ("Jupiter", "Europa", "2099-02-04 15:00", "2099-02-04 19:00", 2000000, 10),
+        ("Earth", "Moon", "2099-03-01 08:00", "2099-03-01 12:00", 500000, 10),
+        ("Moon", "Mars", "2099-03-01 16:00", "2099-03-01 23:00", 800000, 10),
     ]
     
     flights = []

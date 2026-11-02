@@ -2,7 +2,7 @@
 
 Overview and decisions: [`itineraries-plan.md`](itineraries-plan.md). Read it first. Depends on the backend sub-task: [`itineraries-backend.md`](itineraries-backend.md), including its "Handoff notes".
 
-Status: `[ ] pending`
+Status: `[x] completed`
 
 ## Intent
 

@@ -4,8 +4,8 @@ Requirements: [`docs/itinerary-stories.md`](../docs/itinerary-stories.md), overr
 
 Sub-task files (implement in this order, one at a time):
 
-1. [`itineraries-backend.md`](itineraries-backend.md): Python backend (DB, seed, search, hold/confirm flow, routes, tests). Status: `[ ] pending`
-2. [`itineraries-frontend.md`](itineraries-frontend.md): React `/trips` page, header link, API client. Status: `[ ] pending`
+1. [`itineraries-backend.md`](itineraries-backend.md): Python backend (DB, seed, search, hold/confirm flow, routes, tests). Status: `[x] completed`
+2. [`itineraries-frontend.md`](itineraries-frontend.md): React `/trips` page, header link, API client. Status: `[x] completed`
 
 ## Goal
 

@@ -38,3 +38,24 @@ class Booking(Base):
     booking_time = Column(String, nullable=False)
     seat_class = Column(String, nullable=False, default='economy')  # economy/business/galaxium
     price_paid = Column(Integer, nullable=False)  # Actual price at booking time
+    itinerary_id = Column(Integer, ForeignKey('itineraries.id'), nullable=True)
+
+
+class Itinerary(Base):
+    __tablename__ = 'itineraries'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    status = Column(String, nullable=False, default='held')  # held, confirmed, failed
+    total_price = Column(Integer, nullable=False)
+    created_at = Column(String, nullable=False)
+
+
+class ItineraryLeg(Base):
+    __tablename__ = 'itinerary_legs'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    itinerary_id = Column(Integer, ForeignKey('itineraries.id'), nullable=False)
+    position = Column(Integer, nullable=False)
+    flight_id = Column(Integer, ForeignKey('flights.flight_id'), nullable=False)
+    quote_id = Column(String, nullable=False)
+    hold_id = Column(String, nullable=False)
+    booking_id = Column(Integer, ForeignKey('bookings.booking_id'), nullable=True)

@@ -113,4 +113,40 @@ export interface StoredHold {
   reservedUntil: string;
 }
 
+// Itinerary types
+
+export interface ItinerarySearchResult {
+  legs: Flight[];
+  total_price: number;
+  total_duration_minutes: number;
+  first_departure: string;
+  last_arrival: string;
+}
+
+export interface ItineraryRequest {
+  user_id: number;
+  name: string;
+  flight_ids: number[];
+}
+
+export interface ItineraryLeg {
+  id: number;
+  itinerary_id: number;
+  position: number;
+  flight_id: number;
+  quote_id: string;
+  hold_id: string;
+  booking_id?: number | null;
+  flight?: Flight;
+}
+
+export interface Itinerary {
+  id: number;
+  user_id: number;
+  status: 'held' | 'confirmed' | 'failed';
+  total_price: number;
+  created_at: string;
+  legs: ItineraryLeg[];
+}
+
 // Made with Bob
