@@ -85,7 +85,9 @@ def list_flights(
         route_category: Route category (inner_planets, outer_planets, moons)
     
     Returns:
-        List of FlightOut objects with computed prices for all seat classes
+        List of FlightOut objects with computed prices for all seat classes.
+        The list is empty if no flights match. Does not raise for expected
+        failures.
     """
     query = db.query(Flight)
     

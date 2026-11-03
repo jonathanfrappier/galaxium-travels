@@ -7,13 +7,22 @@ from schemas import ErrorResponse, UserOut
 
 
 def is_valid_email(email: str) -> bool:
-    """Validate email address format."""
+    """Check whether an email address has a valid format.
+
+    Returns True if the address matches the expected pattern, otherwise False.
+    """
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(email_pattern, email) is not None
 
 
 def register_user(db: Session, name: str, email: str) -> UserOut | ErrorResponse:
-    """Register a new user with a name and unique email."""
+    """Register a new user with a name and unique email.
+
+    The email is lowercased before validation and storage.
+
+    Returns the created user, or an ErrorResponse with error_code
+    INVALID_EMAIL or EMAIL_EXISTS. Does not raise for these failures.
+    """
     email = email.lower()
     
     if not is_valid_email(email):
@@ -39,7 +48,13 @@ def register_user(db: Session, name: str, email: str) -> UserOut | ErrorResponse
 
 
 def get_user(db: Session, name: str, email: str) -> UserOut | ErrorResponse:
-    """Retrieve a user's information by name and email."""
+    """Retrieve a user's information by name and email.
+
+    The email is lowercased before lookup. Both name and email must match.
+
+    Returns the user, or an ErrorResponse with error_code INVALID_EMAIL or
+    USER_NOT_FOUND. Does not raise for these failures.
+    """
     email = email.lower()
     
     if not is_valid_email(email):
@@ -60,7 +75,14 @@ def get_user(db: Session, name: str, email: str) -> UserOut | ErrorResponse:
     
 
 def update_user(db: Session, user_id: int, name: str, email: str) -> UserOut | ErrorResponse:
-    """Update an existing user's name and email."""
+    """Update an existing user's name and email.
+
+    The new email is lowercased but not format-validated or checked for
+    uniqueness.
+
+    Returns the updated user, or an ErrorResponse with error_code
+    USER_NOT_FOUND. Does not raise for this failure.
+    """
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         return ErrorResponse(

@@ -18,10 +18,11 @@ BACKEND_DIR="$ROOT/booking_system_backend"
 JAVA_DIR="$ROOT/booking_system_inventory_hold_service"
 JAR="$JAVA_DIR/target/inventory-hold-service-1.0.0.jar"
 
-BACKEND_PORT=8001
-JAVA_PORT=8080
+# Same ports as the Docker e2e stack, so a dev stack on 8001/8080 keeps running.
+BACKEND_PORT=18001
+JAVA_PORT=18082
 
-TMPDIR_E2E="$(mktemp -d -t galaxium-e2e)"
+TMPDIR_E2E="$(mktemp -d -t galaxium-e2e.XXXXXX)"
 BACKEND_LOG="$TMPDIR_E2E/backend.log"
 JAVA_LOG="$TMPDIR_E2E/java.log"
 BACKEND_PID=""
@@ -34,6 +35,8 @@ cleanup() {
   # Belt-and-suspenders: free the ports if the PIDs already exited oddly.
   lsof -ti :"$JAVA_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
   lsof -ti :"$BACKEND_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
+  pkill -f "uvicorn server:app.*--port $BACKEND_PORT" 2>/dev/null || true
+  pkill -f "inventory-hold-service.*--server.port=$JAVA_PORT" 2>/dev/null || true
   rm -rf "$TMPDIR_E2E"
 }
 trap cleanup EXIT

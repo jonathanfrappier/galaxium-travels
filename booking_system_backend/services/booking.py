@@ -14,7 +14,16 @@ SEAT_CLASS_MULTIPLIERS = {
 
 
 def book_flight(db: Session, user_id: int, name: str, flight_id: int, seat_class: SeatClass = 'economy') -> BookingOut | ErrorResponse:
-    """Book a seat on a specific flight for a user in the specified seat class."""
+    """Book a seat on a specific flight for a user in the specified seat class.
+
+    Both user_id and name must match a registered user. The price is the
+    flight's base price times the seat class multiplier, and the seat counter
+    for that class is decremented.
+
+    Returns the booking, or an ErrorResponse with error_code INVALID_SEAT_CLASS,
+    FLIGHT_NOT_FOUND, NO_SEATS_AVAILABLE, NAME_MISMATCH, or USER_NOT_FOUND.
+    Does not raise for these failures.
+    """
     # Validate seat class
     if seat_class not in SEAT_CLASS_MULTIPLIERS:
         return ErrorResponse(
@@ -91,7 +100,11 @@ def book_flight(db: Session, user_id: int, name: str, flight_id: int, seat_class
 
 
 def cancel_booking(db: Session, booking_id: int) -> BookingOut | ErrorResponse:
-    """Cancel an existing booking by its booking_id and restore seat to correct class."""
+    """Cancel an existing booking by its booking_id and restore seat to correct class.
+
+    Returns the cancelled booking, or an ErrorResponse with error_code
+    BOOKING_NOT_FOUND or ALREADY_CANCELLED. Does not raise for these failures.
+    """
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         return ErrorResponse(
@@ -124,6 +137,10 @@ def cancel_booking(db: Session, booking_id: int) -> BookingOut | ErrorResponse:
 
 
 def get_bookings(db: Session, user_id: int) -> list[BookingOut]:
-    """Retrieve all bookings for a specific user."""
+    """Retrieve all bookings for a specific user.
+
+    Returns a list of bookings, which is empty if the user has none or does
+    not exist.
+    """
     bookings = db.query(Booking).filter(Booking.user_id == user_id).all()
     return [BookingOut.model_validate(b) for b in bookings]

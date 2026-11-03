@@ -151,18 +151,22 @@ if [ -d "$HOLD_SERVICE_DIR" ]; then
         JAVA_HOME="${JAVA_HOME_FOR_MAVEN:-$JAVA_HOME}" PYTHON_BACKEND_URL=http://localhost:8001 $HOLD_SERVICE_CMD > java.log 2>&1 &
         JAVA_PID=$!
 
-        # Wait for Java service to start and verify
-        sleep 8
-        if ! curl -s http://localhost:8080/api/v1/health > /dev/null 2>&1; then
-            # Try alternate health paths as fallbacks
-            if ! curl -s http://localhost:8080/actuator/health > /dev/null 2>&1; then
-                if ! curl -s http://localhost:8080/ > /dev/null 2>&1; then
-                    echo "⚠️  Java Hold Service failed to start. Check $HOLD_SERVICE_DIR/java.log for errors:"
-                    cat java.log
-                    echo "⚠️  Continuing without Java Hold Service..."
-                    JAVA_PID=""
-                fi
+                # Wait up to 60 seconds for Java service to start and verify
+        JAVA_UP=""
+        for i in $(seq 1 30); do
+            if curl -s http://localhost:8080/api/v1/health > /dev/null 2>&1 \
+                || curl -s http://localhost:8080/actuator/health > /dev/null 2>&1 \
+                || curl -s http://localhost:8080/ > /dev/null 2>&1; then
+                JAVA_UP="yes"
+                break
             fi
+            sleep 2
+        done
+        if [ -z "$JAVA_UP" ]; then
+            echo "⚠️  Java Hold Service failed to start within 60 seconds. Check $HOLD_SERVICE_DIR/java.log for errors:"
+            cat java.log
+            echo "⚠️  Continuing without Java Hold Service..."
+            JAVA_PID=""
         fi
 
         cd ..
@@ -187,7 +191,7 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Start frontend server in background
-npm run dev &
+npm run dev -- --host &
 FRONTEND_PID=$!
 cd ..
 

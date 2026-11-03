@@ -73,7 +73,7 @@ Frontend → POST /quotes        (Python proxy)
 
 ## Quick start
 
-**Prerequisites:** Python 3.8+, Node.js 18+. For the Java hold service: Java 17 or 21 and Maven. For Docker Compose: see the [Docker on macOS notes](#docker-on-macos) below.
+**Prerequisites:** Python 3.10+, Node.js 20.19+ or 22.12+. For the Java hold service: Java 17 or 21 and Maven. For Docker Compose: see the [Docker on macOS notes](#docker-on-macos) below.
 
 ### Option 1 — One command (recommended for local dev)
 
@@ -170,6 +170,13 @@ Seeded automatically on first start:
 | Galaxium | 5.0× | 10% |
 
 Each class has independent seat counters. A sold-out class doesn't block bookings in other classes.
+
+## Multi-leg itineraries
+
+- `GET /itineraries/search` — Search for 1 to 3 leg connecting flight itineraries between planets or moons for a given date.
+- `POST /itineraries` — Create a temporary inventory hold for a multi-leg itinerary across all specified flight legs.
+- `POST /itineraries/{itinerary_id}/confirm` — Confirm a held multi-leg itinerary into confirmed bookings with automatic rollback if any leg fails.
+- `GET /users/{user_id}/itineraries` — Retrieve all confirmed multi-leg itineraries for a specific user ordered by departure date.
 
 ## MCP tools (AI agent API)
 
