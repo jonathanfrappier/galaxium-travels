@@ -171,6 +171,13 @@ Seeded automatically on first start:
 
 Each class has independent seat counters. A sold-out class doesn't block bookings in other classes.
 
+## Multi-leg itineraries
+
+- `GET /itineraries/search` — Search for 1 to 3 leg connecting flight itineraries between planets or moons for a given date.
+- `POST /itineraries` — Create a temporary inventory hold for a multi-leg itinerary across all specified flight legs.
+- `POST /itineraries/{itinerary_id}/confirm` — Confirm a held multi-leg itinerary into confirmed bookings with automatic rollback if any leg fails.
+- `GET /users/{user_id}/itineraries` — Retrieve all confirmed multi-leg itineraries for a specific user ordered by departure date.
+
 ## MCP tools (AI agent API)
 
 The backend exposes six tools at `/mcp`:
