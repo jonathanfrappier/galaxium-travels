@@ -22,7 +22,7 @@ JAR="$JAVA_DIR/target/inventory-hold-service-1.0.0.jar"
 BACKEND_PORT=18001
 JAVA_PORT=18082
 
-TMPDIR_E2E="$(mktemp -d -t galaxium-e2e)"
+TMPDIR_E2E="$(mktemp -d -t galaxium-e2e.XXXXXX)"
 BACKEND_LOG="$TMPDIR_E2E/backend.log"
 JAVA_LOG="$TMPDIR_E2E/java.log"
 BACKEND_PID=""
@@ -35,6 +35,8 @@ cleanup() {
   # Belt-and-suspenders: free the ports if the PIDs already exited oddly.
   lsof -ti :"$JAVA_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
   lsof -ti :"$BACKEND_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
+  pkill -f "uvicorn server:app.*--port $BACKEND_PORT" 2>/dev/null || true
+  pkill -f "inventory-hold-service.*--server.port=$JAVA_PORT" 2>/dev/null || true
   rm -rf "$TMPDIR_E2E"
 }
 trap cleanup EXIT
