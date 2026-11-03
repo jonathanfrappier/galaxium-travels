@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Trust Boundary Audit",
+          "rules": [
+            {
+              "id": "ASVS-V5.1.2",
+              "name": "MassParameterAssignment",
+              "shortDescription": {
+                "text": "V5.1.2: The framework or code protects against mass parameter assignment."
+              },
+              "help": {
+                "text": "OWASP ASVS 4.0 V5.1.2. Checked: PASS. ItineraryRequest only accepts user_id, name and flight_ids; status, total_price, hold_id, booking_id and created_at cannot be set by the client."
+              },
+              "properties": {
+                "tags": ["security", "OWASP-ASVS-4.0", "V5.1.2"]
+              }
+            },
+            {
+              "id": "ASVS-V5.1.3",
+              "name": "AllowListInputValidation",
+              "shortDescription": {
+                "text": "V5.1.3: All input is validated against an allow list of expected fields and values."
+              },
+              "help": {
+                "text": "OWASP ASVS 4.0 V5.1.3. Checked: FAIL (F-1, F-2)."
+              },
+              "properties": {
+                "tags": ["security", "OWASP-ASVS-4.0", "V5.1.3"]
+              }
+            },
+            {
+              "id": "ASVS-V11.1.4",
+              "name": "ExcessiveBusinessRequests",
+              "shortDescription": {
+                "text": "V11.1.4: The application limits excessive business requests, such as one user holding too much inventory."
+              },
+              "help": {
+                "text": "OWASP ASVS 4.0 V11.1.4. Checked: FAIL (F-3, F-4)."
+              },
+              "properties": {
+                "tags": ["security", "OWASP-ASVS-4.0", "V11.1.4"]
+              }
+            },
+            {
+              "id": "ASVS-V11.1.5",
+              "name": "BusinessLogicLimits",
+              "shortDescription": {
+                "text": "V11.1.5: The application has business logic limits that protect against likely abuse, such as a client setting its own price."
+              },
+              "help": {
+                "text": "OWASP ASVS 4.0 V11.1.5. Checked: FAIL (F-5). The client cannot set its own price; total_price is computed from the database."
+              },
+              "properties": {
+                "tags": ["security", "OWASP-ASVS-4.0", "V11.1.5"]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "ASVS-V5.1.3",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "F-1 (Medium): user_id, flight_ids items and itinerary_id are unbounded ints and name is an unbounded str; an integer above 2^63-1 raises OverflowError in the SQLite driver and returns an unhandled HTTP 500. Fix: Use Field(gt=0, le=...) on the IDs, Field(min_length=1, max_length=...) on name, and Path(gt=0, le=...) on itinerary_id."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/schemas.py" },
+                "region": { "startLine": 90, "endLine": 93 }
+              }
+            }
+          ],
+          "relatedLocations": [
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/server.py" },
+                "region": { "startLine": 270 }
+              },
+              "message": { "text": "itinerary_id path parameter has no bounds." }
+            }
+          ],
+          "properties": { "findingId": "F-1", "severity": "Medium", "security-severity": "5.5" }
+        },
+        {
+          "ruleId": "ASVS-V5.1.3",
+          "ruleIndex": 1,
+          "level": "note",
+          "message": {
+            "text": "F-2 (Low): flight_ids has no size or item bounds in the schema, and create_itinerary skips the distinct-locations rule that search_itineraries enforces. Fix: Declare flight_ids: list[int] = Field(min_length=1, max_length=3) and apply the same distinct-locations check in create_itinerary."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/schemas.py" },
+                "region": { "startLine": 93 }
+              }
+            }
+          ],
+          "relatedLocations": [
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 199 }
+              },
+              "message": { "text": "Flight count is checked only after the full list is parsed." }
+            },
+            {
+              "id": 2,
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 241, "endLine": 247 }
+              },
+              "message": { "text": "Connection validation does not check for repeated locations." }
+            }
+          ],
+          "properties": { "findingId": "F-2", "severity": "Low", "security-severity": "3.0" }
+        },
+        {
+          "ruleId": "ASVS-V11.1.4",
+          "ruleIndex": 2,
+          "level": "error",
+          "message": {
+            "text": "F-3 (High): POST /itineraries can be called repeatedly, each call holding up to 3 economy seats, with no per-user hold limit, duplicate check or rate limit. Fix: Reject creation when the user already has more than a small fixed number of held itineraries (or a held itinerary on the same flight), and add rate limiting on this route."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 199, "endLine": 338 }
+              }
+            }
+          ],
+          "relatedLocations": [
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/server.py" },
+                "region": { "startLine": 246 }
+              },
+              "message": { "text": "Route has no rate limiting." }
+            }
+          ],
+          "properties": { "findingId": "F-3", "severity": "High", "security-severity": "8.0" }
+        },
+        {
+          "ruleId": "ASVS-V11.1.4",
+          "ruleIndex": 2,
+          "level": "note",
+          "message": {
+            "text": "F-4 (Low): Every HOLD_FAILED outcome persists a new failed Itinerary row plus legs, so repeated failing requests grow the tables without limit. Fix: Cap stored failed itineraries per user or skip persisting them and log the failure instead."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 298, "endLine": 318 }
+              }
+            }
+          ],
+          "properties": { "findingId": "F-4", "severity": "Low", "security-severity": "3.0" }
+        },
+        {
+          "ruleId": "ASVS-V11.1.5",
+          "ruleIndex": 3,
+          "level": "warning",
+          "message": {
+            "text": "F-5 (Medium): The confirm status check and status write are not atomic, so concurrent confirms of the same held itinerary can release holds the first call confirmed and mark it failed (assumes the Java service rejects a second confirm of the same hold; not verified); create also accepts flights that have already departed. Fix: Claim the itinerary with an atomic UPDATE ... SET status='confirming' WHERE id=? AND status='held' and proceed only if one row changed, and reject flights whose departure time is in the past at create time."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 395, "endLine": 398 }
+              }
+            }
+          ],
+          "relatedLocations": [
+            {
+              "id": 1,
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 416, "endLine": 475 }
+              },
+              "message": { "text": "Per-leg confirm loop and compensation path." }
+            },
+            {
+              "id": 2,
+              "physicalLocation": {
+                "artifactLocation": { "uri": "booking_system_backend/services/itinerary.py" },
+                "region": { "startLine": 226, "endLine": 256 }
+              },
+              "message": { "text": "Flight validation does not check departure time is in the future." }
+            }
+          ],
+          "properties": { "findingId": "F-5", "severity": "Medium", "security-severity": "5.5" }
+        }
+      ]
+    }
+  ]
+}

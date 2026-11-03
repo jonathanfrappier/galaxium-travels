@@ -1,6 +1,6 @@
 """Itinerary service for Galaxium Travels multi-leg bookings."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 
@@ -22,6 +22,8 @@ from services.itinerary_search import is_valid_connection, parse_time
 logger = logging.getLogger(__name__)
 
 JAVA_SERVICE_URL = os.getenv("JAVA_SERVICE_URL", "http://localhost:8080")
+HOLD_DURATION_MINUTES = int(os.getenv("HOLD_DURATION_MINUTES", "15"))
+MAX_HELD_ITINERARIES_PER_USER = 3
 
 
 def get_http_client() -> httpx.Client:
@@ -181,6 +183,24 @@ def search_itineraries(
     return results
 
 
+def _count_active_holds(db: Session, user_id: int) -> int:
+    """Count the user's held itineraries created within the last HOLD_DURATION_MINUTES."""
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(minutes=HOLD_DURATION_MINUTES)
+    held = (
+        db.query(Itinerary)
+        .filter(Itinerary.user_id == user_id, Itinerary.status == "held")
+        .all()
+    )
+    count = 0
+    for itin in held:
+        created = datetime.fromisoformat(itin.created_at.replace("Z", "+00:00"))
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created >= cutoff:
+            count += 1
+    return count
+
+
 def create_itinerary(
     db: Session, request: ItineraryRequest
 ) -> ItineraryOut | ErrorResponse:
@@ -193,7 +213,7 @@ def create_itinerary(
 
     Returns the held itinerary, or an ErrorResponse with error_code
     INVALID_FLIGHT_COUNT, USER_NOT_FOUND, NAME_MISMATCH, FLIGHT_NOT_FOUND,
-    INVALID_CONNECTION, NO_SEATS_AVAILABLE, or HOLD_FAILED.
+    INVALID_CONNECTION, NO_SEATS_AVAILABLE, TOO_MANY_HOLDS, or HOLD_FAILED.
     Does not raise for expected failures.
     """
     if len(request.flight_ids) < 1 or len(request.flight_ids) > 3:
@@ -221,6 +241,13 @@ def create_itinerary(
             error="User not found",
             error_code="USER_NOT_FOUND",
             details=f"User with ID {request.user_id} is not registered in our system.",
+        )
+
+    if _count_active_holds(db, request.user_id) >= MAX_HELD_ITINERARIES_PER_USER:
+        return ErrorResponse(
+            error="Too many holds",
+            error_code="TOO_MANY_HOLDS",
+            details=f"A user may have at most {MAX_HELD_ITINERARIES_PER_USER} held itineraries at a time.",
         )
 
     # Validate flights exist

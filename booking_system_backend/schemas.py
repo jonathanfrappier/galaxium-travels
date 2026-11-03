@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 # Seat class type definition
 SeatClass = Literal['economy', 'business', 'galaxium']
@@ -90,7 +90,7 @@ class ErrorResponse(BaseModel):
 class ItineraryRequest(BaseModel):
     user_id: int
     name: str
-    flight_ids: list[int]
+    flight_ids: list[int] = Field(min_length=1, max_length=3)
 
 
 class ItinerarySearchResult(BaseModel):

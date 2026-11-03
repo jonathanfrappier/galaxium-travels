@@ -250,12 +250,15 @@ def create_itinerary_endpoint(request: ItineraryRequest, db: Session = Depends(g
     Requires user_id, registered traveler name, and list of 1 to 3 flight_ids.
     Places inventory holds for every leg across the itinerary.
     Raises 404 if user or any flight is not found, 409 if name does not match user or no seats are available,
+    429 (TOO_MANY_HOLDS) if the user already has 3 held itineraries within the hold duration,
     502 if holding inventory with the Java service fails, or 422 for invalid flight counts/connections.
     """
     result = itinerary.create_itinerary(db, request)
     if isinstance(result, ErrorResponse):
         if result.error_code in ("USER_NOT_FOUND", "FLIGHT_NOT_FOUND"):
             status = 404
+        elif result.error_code == "TOO_MANY_HOLDS":
+            status = 429
         elif result.error_code in ("NO_SEATS_AVAILABLE", "NAME_MISMATCH"):
             status = 409
         elif result.error_code == "HOLD_FAILED":

@@ -1,10 +1,12 @@
 """Tests for multi-leg itineraries: search, hold, confirm, list, seed, and migration."""
 
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import Column, Integer, String, create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -352,7 +354,7 @@ class TestItineraryCreateAndConfirm:
         assert failed_itin is not None
 
     def test_create_validation_errors(self, db_session, setup_data):
-        """Test name mismatch, invalid flight count, invalid connection, unknown user, sold out."""
+        """Test name mismatch, invalid connection, unknown user, sold out."""
         user, flights = setup_data
 
         # Name mismatch
@@ -367,12 +369,6 @@ class TestItineraryCreateAndConfirm:
         ))
         assert isinstance(res2, ErrorResponse) and res2.error_code == "USER_NOT_FOUND"
 
-        # Four flight ids
-        res3 = itinerary.create_itinerary(db_session, ItineraryRequest(
-            user_id=user.user_id, name=user.name, flight_ids=[1, 2, 3, 4]
-        ))
-        assert isinstance(res3, ErrorResponse) and res3.error_code == "INVALID_FLIGHT_COUNT"
-
         # Invalid connection
         res4 = itinerary.create_itinerary(db_session, ItineraryRequest(
             user_id=user.user_id, name=user.name, flight_ids=[flights[0].flight_id, flights[2].flight_id]
@@ -386,6 +382,99 @@ class TestItineraryCreateAndConfirm:
             user_id=user.user_id, name=user.name, flight_ids=[flights[0].flight_id]
         ))
         assert isinstance(res5, ErrorResponse) and res5.error_code == "NO_SEATS_AVAILABLE"
+
+    @pytest.mark.parametrize("flight_ids", [[], [1, 2, 3, 4]])
+    def test_flight_ids_length_rejected_with_422(self, client, setup_data, flight_ids):
+        """POST /itineraries rejects 0 or more than 3 flight_ids at the schema level."""
+        user, _ = setup_data
+        resp = client.post("/itineraries", json={
+            "user_id": user.user_id, "name": user.name, "flight_ids": flight_ids,
+        })
+        assert resp.status_code == 422
+
+    def test_flight_ids_schema_accepts_one_to_three(self):
+        """ItineraryRequest accepts 1 and 3 flight_ids and rejects 0 and 4."""
+        for ids in ([1], [1, 2, 3]):
+            assert ItineraryRequest(user_id=1, name="Alice", flight_ids=ids).flight_ids == ids
+        for ids in ([], [1, 2, 3, 4]):
+            with pytest.raises(ValidationError):
+                ItineraryRequest(user_id=1, name="Alice", flight_ids=ids)
+
+
+class TestHoldLimit:
+    """Test the per-user limit of 3 held itineraries within HOLD_DURATION_MINUTES."""
+
+    @pytest.fixture
+    def setup_data(self, db_session):
+        """Two users and one flight."""
+        alice = User(name="Alice", email="alice@example.com")
+        bob = User(name="Bob", email="bob@example.com")
+        db_session.add_all([alice, bob])
+        flight = Flight(
+            origin="Earth", destination="Mars",
+            departure_time="2099-02-01 09:00", arrival_time="2099-02-01 17:00",
+            base_price=1000000, economy_seats_available=50, business_seats_available=3, galaxium_seats_available=1
+        )
+        db_session.add(flight)
+        db_session.commit()
+        return alice, bob, flight
+
+    @pytest.fixture
+    def mock_java(self, monkeypatch):
+        """Mock the Java hold service so every quote and hold succeeds."""
+        counter = {"n": 0}
+
+        def handler(request: httpx.Request):
+            url = str(request.url)
+            counter["n"] += 1
+            if "/holds" in url:
+                return httpx.Response(200, json={"holdId": f"H-{counter['n']}"})
+            return httpx.Response(200, json={"quoteId": f"Q-{counter['n']}"})
+
+        monkeypatch.setattr(
+            itinerary, "get_http_client",
+            lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+
+    @staticmethod
+    def _post(client, user, flight):
+        return client.post("/itineraries", json={
+            "user_id": user.user_id, "name": user.name, "flight_ids": [flight.flight_id],
+        })
+
+    def test_fourth_hold_returns_429(self, client, setup_data, mock_java):
+        """Three holds succeed; the fourth returns 429 TOO_MANY_HOLDS."""
+        alice, _, flight = setup_data
+        for _ in range(3):
+            assert self._post(client, alice, flight).status_code == 200
+        resp = self._post(client, alice, flight)
+        assert resp.status_code == 429
+        assert resp.json()["detail"]["error_code"] == "TOO_MANY_HOLDS"
+
+    def test_limit_is_per_user(self, client, setup_data, mock_java):
+        """One user reaching the limit does not block another user."""
+        alice, bob, flight = setup_data
+        for _ in range(3):
+            assert self._post(client, alice, flight).status_code == 200
+        assert self._post(client, bob, flight).status_code == 200
+
+    def test_old_holds_do_not_count(self, client, db_session, setup_data, mock_java):
+        """Held itineraries older than HOLD_DURATION_MINUTES are not counted."""
+        alice, _, flight = setup_data
+        old = (datetime.now(tz=timezone.utc) - timedelta(minutes=itinerary.HOLD_DURATION_MINUTES + 1)).isoformat()
+        for _ in range(3):
+            db_session.add(Itinerary(user_id=alice.user_id, status="held", total_price=1, created_at=old))
+        db_session.commit()
+        assert self._post(client, alice, flight).status_code == 200
+
+    def test_non_held_itineraries_do_not_count(self, client, db_session, setup_data, mock_java):
+        """Failed and confirmed itineraries do not count toward the limit."""
+        alice, _, flight = setup_data
+        now = datetime.now(tz=timezone.utc).isoformat()
+        for status in ("failed", "confirmed", "failed"):
+            db_session.add(Itinerary(user_id=alice.user_id, status=status, total_price=1, created_at=now))
+        db_session.commit()
+        assert self._post(client, alice, flight).status_code == 200
 
 
 class TestConfirmFailureCompensation:
